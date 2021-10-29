@@ -34,6 +34,9 @@ func (p *process) String() string {
 }
 
 func (p *process) open(conn *RedisConn) error {
+	deleteByKey(conn, fmt.Sprintf("%sworker:%s*", workerSettings.Namespace, p.Hostname))
+	deleteByKey(conn, fmt.Sprintf("%sstat:processed:%s*", workerSettings.Namespace, p.Hostname))
+	deleteByKey(conn, fmt.Sprintf("%sstat:failed:%s*", workerSettings.Namespace, p.Hostname))
 	conn.Send("SADD", fmt.Sprintf("%sworkers", workerSettings.Namespace), p)
 	conn.Send("SET", fmt.Sprintf("%sstat:processed:%v", workerSettings.Namespace, p), "0")
 	conn.Send("SET", fmt.Sprintf("%sstat:failed:%v", workerSettings.Namespace, p), "0")

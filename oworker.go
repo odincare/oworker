@@ -29,6 +29,8 @@ type WorkerSettings struct {
 	Interval       intervalFlag
 	Concurrency    int
 	Connections    int
+	MaxRetry       int
+	FailedDelly    float64
 	URI            string
 	Namespace      string
 	ExitOnComplete bool
@@ -39,6 +41,12 @@ type WorkerSettings struct {
 }
 
 func SetSettings(settings WorkerSettings) {
+	if settings.MaxRetry == 0 {
+		settings.MaxRetry = 5
+	}
+	if settings.FailedDelly == 0 {
+		settings.FailedDelly = 2
+	}
 	workerSettings = settings
 }
 
@@ -111,7 +119,7 @@ func Close() {
 	}
 }
 
-// Work starts the goworker process. Check for errors in
+// Work starts the oworker process. Check for errors in
 // the return value. Work will take over the Go executable
 // and will run until a QUIT, INT, or TERM signal is
 // received, or until the queues are empty if the
@@ -134,6 +142,13 @@ func Work() error {
 		return err
 	}
 
+	if len(failHandlers) > 0 {
+		fialedJobs, err := poller.pollFailed(time.Duration(workerSettings.Interval), quit)
+		if err != nil {
+			return err
+		}
+		newFailedHandle().handle(fialedJobs)
+	}
 	var monitor sync.WaitGroup
 
 	for id := 0; id < workerSettings.Concurrency; id++ {
@@ -143,7 +158,6 @@ func Work() error {
 		}
 		worker.work(jobs, &monitor)
 	}
-
 	monitor.Wait()
 
 	return nil

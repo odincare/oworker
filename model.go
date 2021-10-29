@@ -11,6 +11,13 @@ type Job struct {
 	Queue   string
 	Payload Payload
 }
+type FailPayload struct {
+	Args     []interface{} `json:"args"`
+	Error    string        `json:"error"`
+	Times    int           `json:"times"`
+	MaxTry   int           `json:"max_try"`
+	FailedAt time.Time     `json:"failed_at"`
+}
 
 type work struct {
 	Queue   string    `json:"queue"`
@@ -19,14 +26,27 @@ type work struct {
 }
 
 type failure struct {
-	FailedAt  time.Time `json:"failed_at"`
-	Payload   Payload   `json:"payload"`
-	Exception string    `json:"exception"`
-	Error     string    `json:"error"`
-	Backtrace []string  `json:"backtrace"`
-	Worker    *worker   `json:"worker"`
-	Queue     string    `json:"queue"`
+	FailedAt  time.Time   `json:"failed_at"`
+	Payload   Payload     `json:"payload"`
+	Exception string      `json:"exception"`
+	Error     string      `json:"error"`
+	Times     int         `json:"times"`
+	MaxTry    int         `json:"max_try"`
+	Backtrace []string    `json:"backtrace"`
+	Worker    *worker     `json:"worker"`
+	Queue     string      `json:"queue"`
+	ExecTime  []time.Time `json:"exec_time"`
 }
 
-//处理函数定义
-type workerFunc func(string, ...interface{}) error
+type failureData struct {
+	FailedAt  time.Time   `json:"failed_at"`
+	Payload   Payload     `json:"payload"`
+	Exception string      `json:"exception"`
+	Error     string      `json:"error"`
+	Times     int         `json:"times"`
+	MaxTry    int         `json:"max_try"`
+	Backtrace []string    `json:"backtrace"`
+	Worker    string      `json:"worker"`
+	Queue     string      `json:"queue"`
+	ExecTime  []time.Time `json:"exec_time"`
+}

@@ -1,10 +1,11 @@
 package oworker
 
 import (
+	"errors"
 	"fmt"
 	"os"
-	"reflect"
 	"testing"
+	"time"
 )
 
 var workerMarshalJSONTests = []struct {
@@ -43,7 +44,7 @@ func TestWorkerMarshalJSON(t *testing.T) {
 
 func TestEnqueue(t *testing.T) {
 	initConfig()
-	expectedArgs := []interface{}{"a", "lot", "of", "params"}
+	expectedArgs := []interface{}{"a1", "lot", "of", "params"}
 	jobName := "SomethingCool"
 	queueName := "testQueue"
 	expectedJob := &Job{
@@ -62,35 +63,44 @@ func TestEnqueue(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error while enqueue %s", err)
 	}
+}
 
+func TestWorker(t *testing.T) {
+	initConfig()
+	jobName := "SomethingCool"
 	actualArgs := []interface{}{}
 	actualQueueName := ""
 	Register(jobName, func(queue string, args ...interface{}) error {
 		actualArgs = args
 		actualQueueName = queue
-		return nil
+		fmt.Println(actualArgs)
+		fmt.Println(actualQueueName)
+		return errors.New("生成的错误")
 	})
-	if err := Work(); err != nil {
-		t.Errorf("(Enqueue) Failed on work %s", err)
-	}
-	if !reflect.DeepEqual(actualArgs, expectedArgs) {
-		t.Errorf("(Enqueue) Expected %v, actual %v", actualArgs, expectedArgs)
-	}
-	if !reflect.DeepEqual(actualQueueName, queueName) {
-		t.Errorf("(Enqueue) Expected %v, actual %v", actualQueueName, queueName)
-	}
-}
 
+	RegisterFail(jobName, func(s string, data FailPayload) error {
+		//fmt.Println("@@@@@@@@@处理错误.........@@@@@@")
+		fmt.Println("错误信息", data)
+		return errors.New("是大福利科技")
+	})
+	go func() {
+		if err := Work(); err != nil {
+			t.Errorf("(Enqueue) Failed on work %s", err)
+		}
+	}()
+
+	time.Sleep(500 * time.Second)
+}
 func initConfig() {
-	fmt.Println("配置初始化....")
+	fmt.Println("测试输出---配置初始化....")
 	redisHost := os.Getenv("REDIS_ADDR")
 	pwd := os.Getenv("REDIS_PWD")
 	settings := WorkerSettings{
 		URI:            "redis://" + pwd + "*@" + redisHost + ":6379/10",
 		Connections:    100,
-		Queues:         []string{"myqueue", "delimited", "queues"},
+		Queues:         []string{"testQueue", "delimited", "queues"},
 		UseNumber:      true,
-		ExitOnComplete: false,
+		ExitOnComplete: true,
 		Concurrency:    2,
 		Namespace:      "resque:",
 		Interval:       5.0,

@@ -141,3 +141,111 @@ func (p *poller) poll(interval time.Duration, quit <-chan bool) (<-chan *Job, er
 
 	return jobs, nil
 }
+
+func (p *poller) pollFailed(interval time.Duration, quit <-chan bool) (<-chan *failureData, error) {
+	failedJobs := make(chan *failureData)
+	conn, err := GetConn()
+	if err != nil {
+		logger.Criticalf("Error on getting connection in poller %s: %v", p, err)
+		close(failedJobs)
+		PutConn(conn)
+		return nil, err
+	} else {
+		PutConn(conn)
+	}
+
+	go func() {
+		defer func() {
+			close(failedJobs)
+			conn, err := GetConn()
+			if err != nil {
+				logger.Criticalf("Error on getting connection in poller %s: %v", p, err)
+				return
+			} else {
+				PutConn(conn)
+			}
+		}()
+
+		for {
+			select {
+			case <-quit:
+				return
+			default:
+				conn, err := GetConn()
+				if err != nil {
+					logger.Criticalf("Error on getting connection in poller %s: %v", p, err)
+					return
+				}
+
+				failedJob, err := p.GetFailedJob(conn)
+
+				if err != nil {
+					logger.Criticalf("Error on %v getting job from %v: %v", p, p.Queues, err)
+					PutConn(conn)
+					return
+				}
+				if failedJob != nil {
+					select {
+					case failedJobs <- failedJob:
+					case <-quit:
+						buffer, _ := json.Marshal(failedData2Model(failedJob))
+						conn.Send("RPUSH", fmt.Sprintf("%sfailed:%s", workerSettings.Namespace, failedJob.Queue), buffer)
+						conn.Flush()
+						PutConn(conn)
+						return
+					}
+				} else {
+					PutConn(conn)
+					if workerSettings.ExitOnComplete {
+						return
+					}
+					logger.Debugf("Sleeping for %v", interval)
+					logger.Debugf("Waiting for %v", p.Queues)
+
+					timeout := time.After(interval)
+					select {
+					case <-quit:
+						return
+					case <-timeout:
+					}
+				}
+
+			}
+		}
+
+	}()
+	return failedJobs, nil
+}
+
+func (p *poller) GetFailedJob(conn *RedisConn) (*failureData, error) {
+	for _, queue := range p.queues(p.isStrict) {
+		logger.Debugf("Checking %s", queue)
+		reply, err := conn.Do("LPOP", fmt.Sprintf("%sfailed:%s", workerSettings.Namespace, queue))
+		if err != nil {
+			return nil, err
+		}
+		if reply != nil {
+			logger.Debugf("Found job on %s", queue)
+
+			failedJob := &failureData{Queue: queue}
+
+			decoder := json.NewDecoder(bytes.NewReader(reply.([]byte)))
+			if workerSettings.UseNumber {
+				decoder.UseNumber()
+			}
+
+			if err := decoder.Decode(&failedJob); err != nil {
+				return nil, err
+			}
+			subTime := time.Now().Sub(failedJob.FailedAt).Seconds()
+			if subTime < workerSettings.FailedDelly {
+				conn.Send("RPUSH", fmt.Sprintf("%sfailed:%s", workerSettings.Namespace, failedJob.Queue), reply.([]byte))
+				conn.Flush()
+				return nil, nil
+			}
+			return failedJob, nil
+		}
+	}
+
+	return nil, nil
+}

@@ -8,6 +8,9 @@ import (
 	"time"
 )
 
+//处理函数定义
+type workerFunc func(string, ...interface{}) error
+
 type worker struct {
 	process
 }
@@ -51,13 +54,15 @@ func (w *worker) fail(conn *RedisConn, job *Job, err error) error {
 		Exception: "Error",
 		Error:     err.Error(),
 		Worker:    w,
+		MaxTry:    workerSettings.MaxRetry,
 		Queue:     job.Queue,
+		ExecTime:  []time.Time{time.Now()},
 	}
 	buffer, err := json.Marshal(failure)
 	if err != nil {
 		return err
 	}
-	conn.Send("RPUSH", fmt.Sprintf("%sfailed", workerSettings.Namespace), buffer)
+	conn.Send("RPUSH", fmt.Sprintf("%sfailed:%s", workerSettings.Namespace, job.Queue), buffer)
 
 	return w.process.fail(conn)
 }

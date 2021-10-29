@@ -116,3 +116,12 @@ func getCertPool(certPath string) (*x509.CertPool, error) {
 	}
 	return rootCAs, nil
 }
+func deleteByKey(conn *RedisConn, key string) {
+	val, _ := redis.Strings(conn.Do("KEYS", key))
+	conn.Send("MULTI")
+	for i, _ := range val {
+
+		conn.Send("DEL", val[i])
+	}
+	conn.Do("EXEC")
+}
