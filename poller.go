@@ -188,7 +188,7 @@ func (p *poller) pollFailed(interval time.Duration, quit <-chan bool) (<-chan *f
 					select {
 					case failedJobs <- failedJob:
 					case <-quit:
-						buffer, _ := json.Marshal(failedData2Model(failedJob))
+						buffer, _ := json.Marshal(failedData2Model(failedJob, "writeBack"))
 						conn.Send("RPUSH", fmt.Sprintf("%sfailed:%s", workerSettings.Namespace, failedJob.Queue), buffer)
 						conn.Flush()
 						PutConn(conn)
@@ -209,7 +209,6 @@ func (p *poller) pollFailed(interval time.Duration, quit <-chan bool) (<-chan *f
 					case <-timeout:
 					}
 				}
-
 			}
 		}
 

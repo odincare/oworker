@@ -17,8 +17,9 @@ func init() {
 // refers to the Ruby name of the class which enqueues the
 // job. Worker is a function which accepts a queue and an
 // arbitrary array of interfaces as arguments.
-func Register(class string, worker workerFunc) {
+func Register(class string, worker workerFunc, failed failedFunc) {
 	workers[class] = worker
+	failHandlers[class] = failed
 }
 
 func Enqueue(job *Job) error {

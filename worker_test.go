@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"testing"
-	"time"
 )
 
 var workerMarshalJSONTests = []struct {
@@ -46,6 +45,7 @@ func TestEnqueue(t *testing.T) {
 	initConfig()
 	expectedArgs := []interface{}{"a1", "lot", "of", "params"}
 	jobName := "SomethingCool"
+	jobName2 := "test_error_2"
 	queueName := "testQueue"
 	expectedJob := &Job{
 		Queue: queueName,
@@ -55,11 +55,20 @@ func TestEnqueue(t *testing.T) {
 		},
 	}
 
+	expectedJob2 := &Job{
+		Queue: queueName,
+		Payload: Payload{
+			Class: jobName2,
+			Args:  expectedArgs,
+		},
+	}
+
 	workerSettings.Queues = []string{queueName}
 	workerSettings.UseNumber = true
 	workerSettings.ExitOnComplete = true
 
 	err := Enqueue(expectedJob)
+	err = Enqueue(expectedJob2)
 	if err != nil {
 		t.Errorf("Error while enqueue %s", err)
 	}
@@ -76,20 +85,27 @@ func TestWorker(t *testing.T) {
 		fmt.Println(actualArgs)
 		fmt.Println(actualQueueName)
 		return errors.New("生成的错误")
-	})
-
-	RegisterFail(jobName, func(s string, data FailPayload) error {
+	}, func(s string, data FailPayload) error {
 		//fmt.Println("@@@@@@@@@处理错误.........@@@@@@")
-		fmt.Println("错误信息", data)
+		fmt.Println("错误处理", data)
 		return errors.New("是大福利科技")
 	})
-	go func() {
-		if err := Work(); err != nil {
-			t.Errorf("(Enqueue) Failed on work %s", err)
-		}
-	}()
+	Register("test_error_2", func(queue string, args ...interface{}) error {
+		actualArgs = args
+		actualQueueName = queue
+		fmt.Println(actualArgs)
+		fmt.Println(actualQueueName)
+		return errors.New("测试错误2222")
+	}, func(s string, data FailPayload) error {
+		//fmt.Println("@@@@@@@@@处理错误.........@@@@@@")
+		fmt.Println("错误处理", data)
+		return errors.New("是大福利科技")
+	})
 
-	time.Sleep(500 * time.Second)
+	if err := Work(); err != nil {
+		t.Errorf("(Enqueue) Failed on work %s", err)
+	}
+
 }
 func initConfig() {
 	fmt.Println("测试输出---配置初始化....")
@@ -100,7 +116,7 @@ func initConfig() {
 		Connections:    100,
 		Queues:         []string{"testQueue", "delimited", "queues"},
 		UseNumber:      true,
-		ExitOnComplete: true,
+		ExitOnComplete: false,
 		Concurrency:    2,
 		Namespace:      "resque:",
 		Interval:       5.0,
