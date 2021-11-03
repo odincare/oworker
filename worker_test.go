@@ -96,11 +96,7 @@ func TestWorker(t *testing.T) {
 		fmt.Println(actualArgs)
 		fmt.Println(actualQueueName)
 		return errors.New("测试错误2222")
-	}, func(s string, data FailPayload) error {
-		//fmt.Println("@@@@@@@@@处理错误.........@@@@@@")
-		fmt.Println("错误处理", data)
-		return errors.New("是大福利科技")
-	})
+	}, nil)
 
 	if err := Work(); err != nil {
 		t.Errorf("(Enqueue) Failed on work %s", err)

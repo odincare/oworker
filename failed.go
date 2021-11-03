@@ -50,11 +50,16 @@ func (p *failedHandler) handle(jobs <-chan *failureData) {
 		}()
 		for job := range jobs {
 			if hand, ok := failHandlers[job.Payload.Class]; ok {
+
+				if hand == nil {
+					continue
+				}
 				if job.Times != 0 && job.MaxTry != 0 {
-					if job.Times >= job.MaxTry || job.Times == 100 {
+					if job.Times > job.MaxTry || job.Times == 100 {
 						continue
 					}
 				}
+
 				data := FailPayload{
 					Args:     job.Payload.Args,
 					Error:    job.Error,
